@@ -1,2 +1,11 @@
 geomock.exe
 *.exe
+
+# Environment secrets — NEVER commit this
+.env
+
+# Progress reports and project documentation reports — exclude from VCS
+*progress_report*
+*_report.*
+*progress*report*
+geomock_progress_report.md
