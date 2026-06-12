@@ -61,7 +61,7 @@ func (p *TelemetryPublisher) StartPublishingLoop(ctx context.Context) {
 }
 
 func (p *TelemetryPublisher) flushBatch(ctx context.Context, batch []Telemetry) {
-	if len(batch) == 0 {
+	if len(batch) == 0 || p.client == nil {
 		return
 	}
 
