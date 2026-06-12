@@ -40,27 +40,170 @@ The architecture of GeoMock is split into a robust backend and a highly optimize
 ### Architecture Diagram
 
 ```mermaid
-flowchart TD
-    A["1000 DriverAgents\n(goroutines)"] -->|emit Telemetry| B[IngestionChan]
-    B --> C[TelemetryPublisher]
-    C -->|batch XAdd| D[(Redis Stream\ntelemetry:stream)]
-    C -->|BridgeChan clone| E[Direct WS Bridge\n1-second batch]
-    D --> F[TelemetryConsumer]
-    F --> G[WS Hub /ws/live]
-    E --> G
-    G -->|JSON batch| H[React useTelemetry hook]
-    H --> I[Canvas2D rAF loop]
-    I --> J[LiveMap\nCyberpunk overlay]
+flowchart LR
 
-    A -->|PayloadCh clone| K[WebhookForwarder\n10 workers]
-    K -->|POST JSON| L[External Endpoint\nWEBHOOK_TARGET_URL]
-    K -->|RequestStat| M[MetricsAggregator]
-    M -->|broadcast| N[WS Hub /ws/metrics]
-    N --> O[useMetrics hook]
-    O --> P[PerformanceDashboard]
+%% =========================
+%% STYLES
+%% =========================
 
-    Q[Overseer AI\nGemini 2.5 Flash] -->|control_simulation tool| R[API /api/chat]
-    R -->|rescatter/start| A
+classDef engine fill:#07141d,stroke:#00e5b0,color:#ffffff,stroke-width:2px;
+classDef queue fill:#0b1720,stroke:#00c2ff,color:#ffffff,stroke-width:2px;
+classDef database fill:#12202a,stroke:#00ffcc,color:#ffffff,stroke-width:3px;
+classDef frontend fill:#101827,stroke:#00e5b0,color:#ffffff,stroke-width:2px;
+classDef ai fill:#1b1330,stroke:#b388ff,color:#ffffff,stroke-width:2px;
+classDef metrics fill:#201400,stroke:#ffb300,color:#ffffff,stroke-width:2px;
+classDef external fill:#220f0f,stroke:#ff6b6b,color:#ffffff,stroke-width:2px;
+
+%% =========================
+%% SIMULATION ENGINE
+%% =========================
+
+subgraph SIM["🚖 High-Concurrency Simulation Engine (Go)"]
+direction TB
+
+A["1000+ Driver Agents<br/>(Goroutines)"]
+B["GeoJSON Graph Router"]
+C["Tick Scheduler<br/>1000ms / tick"]
+D["Telemetry Publisher"]
+
+A --> B
+B --> C
+C --> D
+
+end
+
+class A,B,C,D engine
+
+%% =========================
+%% TELEMETRY PIPELINE
+%% =========================
+
+subgraph PIPE["📡 Real-Time Telemetry Pipeline"]
+direction TB
+
+RS[("Redis Stream<br/>telemetry:stream")]
+WSB["Direct WebSocket Bridge<br/>1s Batch Flush"]
+CON["Telemetry Consumer"]
+
+D -->|"XADD Batch"| RS
+D -->|"BridgeChan Clone"| WSB
+
+RS --> CON
+
+end
+
+class RS database
+class WSB,CON queue
+
+%% =========================
+%% LOAD TEST FRAMEWORK
+%% =========================
+
+subgraph LOAD["⚡ Load Testing Framework"]
+direction TB
+
+WF["Webhook Forwarder<br/>Worker Pool (10 Workers)"]
+EXT["External Endpoint<br/>WEBHOOK_TARGET_URL"]
+MA["Metrics Aggregator"]
+
+A -->|"Payload Clone"| WF
+
+WF -->|"POST JSON"| EXT
+WF -->|"Request Stats"| MA
+
+end
+
+class WF metrics
+class MA metrics
+class EXT external
+
+%% =========================
+%% AI CONTROL PLANE
+%% =========================
+
+subgraph AI["🤖 AI Overseer Control Plane"]
+direction TB
+
+LLM["Gemini 2.5 Flash<br/>via OpenRouter"]
+API["/api/chat"]
+TOOLS["Function Calling Layer"]
+
+LLM --> TOOLS
+TOOLS --> API
+
+end
+
+class LLM,API,TOOLS ai
+
+%% =========================
+%% WEBSOCKET HUB
+%% =========================
+
+subgraph HUB["🔌 Real-Time Transport Layer"]
+direction TB
+
+LIVE["WS Hub<br/>/ws/live"]
+MET["WS Hub<br/>/ws/metrics"]
+
+CON --> LIVE
+WSB --> LIVE
+
+MA --> MET
+
+end
+
+class LIVE,MET queue
+
+%% =========================
+%% FRONTEND
+%% =========================
+
+subgraph FRONT["🖥 React + Vite Frontend"]
+direction TB
+
+UT["useTelemetry Hook"]
+UM["useMetrics Hook"]
+
+RAF["Canvas2D Renderer<br/>requestAnimationFrame"]
+MAP["Live Cyberpunk Map<br/>60 FPS"]
+
+DASH["Performance Dashboard"]
+
+LIVE --> UT
+UT --> RAF
+RAF --> MAP
+
+MET --> UM
+UM --> DASH
+
+end
+
+class UT,UM,RAF,MAP,DASH frontend
+
+%% =========================
+%% AI INTERACTION
+%% =========================
+
+API -->|"Start Simulation"| A
+API -->|"Respawn Agents"| A
+API -->|"Change Tick Rate"| C
+API -->|"Upload New City"| B
+
+%% =========================
+%% USER
+%% =========================
+
+USER(["👤 User"])
+
+USER --> MAP
+USER --> DASH
+USER --> API
+
+%% =========================
+%% LINKS
+%% =========================
+
+linkStyle default stroke:#00d4aa,stroke-width:2px;
 ```
 
 
