@@ -6,7 +6,8 @@ interface Props {
 }
 
 export const LoadTestPanel: React.FC<Props> = ({ metrics }) => {
-  const [url, setUrl] = useState('http://localhost:8080/api/start');
+  const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+  const [url, setUrl] = useState(`${API_BASE}/api/start`);
   const [method, setMethod] = useState('POST');
   const [agents, setAgents] = useState(100);
   const [pattern, setPattern] = useState('spike');
@@ -15,7 +16,7 @@ export const LoadTestPanel: React.FC<Props> = ({ metrics }) => {
   const handleStart = async () => {
     setIsRunning(true);
     try {
-      await fetch('http://localhost:8080/api/loadtest/start', {
+      await fetch(`${API_BASE}/api/loadtest/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -35,7 +36,7 @@ export const LoadTestPanel: React.FC<Props> = ({ metrics }) => {
 
   const handleStop = async () => {
     try {
-      await fetch('http://localhost:8080/api/loadtest/stop', { method: 'POST' });
+      await fetch(`${API_BASE}/api/loadtest/stop`, { method: 'POST' });
     } catch (e) {}
     setIsRunning(false);
   };
