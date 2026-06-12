@@ -20,7 +20,7 @@ GeoMock is built to solve the complex challenge of testing and visualizing high-
 
 ## User Flow
 
-![User Flow Diagram](./user%20flow%20diagram.png)
+![User Flow Diagram](./frontend/public/user%20flow%20diagram.png)
 
 ## System Architecture
 
