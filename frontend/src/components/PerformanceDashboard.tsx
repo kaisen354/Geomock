@@ -12,68 +12,50 @@ interface CardProps {
   label: string;
   value: string;
   unit: string;
-  accent: string;      // border + icon colour
-  valueColor?: string; // override value colour (e.g. red on failures)
+  accent: string;
+  valueColor?: string;
 }
 
 const MetricCard: React.FC<CardProps> = ({ icon, label, value, unit, accent, valueColor }) => (
   <div style={{
-    background: 'rgba(8, 14, 26, 0.85)',
-    border: `1px solid rgba(255,255,255,0.07)`,
-    borderTop: `2px solid ${accent}`,
-    borderRadius: '6px',
-    padding: '1.1rem 1.4rem 0.9rem',
+    background: 'var(--canvas-night)',
+    border: '1px solid var(--hairline)',
+    borderRadius: '12px',
+    padding: '32px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.55rem',
-    backdropFilter: 'blur(12px)',
-    boxShadow: `0 0 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03)`,
+    gap: '12px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
     position: 'relative',
     overflow: 'hidden',
   }}>
-    {/* Subtle corner glow matching accent */}
-    <div style={{
-      position: 'absolute', top: 0, right: 0,
-      width: 80, height: 80,
-      background: `radial-gradient(circle at top right, ${accent}14, transparent 70%)`,
-      pointerEvents: 'none',
-    }} />
-
     {/* Label row */}
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '0.4rem',
-      color: accent, fontSize: '0.68rem', fontWeight: 600,
-      letterSpacing: '0.1em', textTransform: 'uppercase',
-      fontFamily: 'var(--font-mono)',
+      display: 'flex', alignItems: 'center', gap: '8px',
+      color: 'var(--ink-mute)', fontSize: '14px', fontWeight: 500,
+      fontFamily: 'var(--font-ui)',
     }}>
-      {icon}
+      <div style={{ color: accent, display: 'flex', alignItems: 'center' }}>
+        {icon}
+      </div>
       <span>{label}</span>
     </div>
 
     {/* Value */}
     <div style={{
-      fontFamily: 'var(--font-mono)',
-      fontSize: '2.25rem',
-      fontWeight: 700,
-      lineHeight: 1,
-      color: valueColor ?? 'rgba(255,255,255,0.92)',
-      textShadow: valueColor ? `0 0 20px ${valueColor}80` : '0 0 12px rgba(255,255,255,0.15)',
+      fontFamily: 'var(--font-ui)',
+      fontSize: '28px',
+      fontWeight: 500,
+      lineHeight: 1.2,
+      letterSpacing: '-0.42px',
+      color: valueColor ?? 'var(--on-dark)',
       display: 'flex',
       alignItems: 'baseline',
-      gap: '0.35rem',
+      gap: '6px',
     }}>
       {value}
-      <span style={{ fontSize: '1rem', fontWeight: 400, color: 'rgba(255,255,255,0.45)' }}>{unit}</span>
+      <span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--ink-mute)' }}>{unit}</span>
     </div>
-
-    {/* Sparkline bar */}
-    <div style={{
-      height: 3, borderRadius: 2,
-      background: `linear-gradient(90deg, ${accent}, ${accent}66)`,
-      boxShadow: `0 0 8px ${accent}88`,
-      marginTop: '0.1rem',
-      width: '60%',
-    }} />
   </div>
 );
 
@@ -82,29 +64,27 @@ const EmptyState: React.FC = () => (
   <div style={{
     display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    height: '100%', gap: '1rem',
+    height: '100%', gap: '16px',
   }}>
     <div style={{
       width: 40, height: 40,
-      border: '2px solid rgba(0,255,204,0.15)',
-      borderTop: '2px solid #00ffcc',
+      border: '2px solid var(--hairline)',
+      borderTop: '2px solid var(--primary)',
       borderRadius: '50%',
       animation: 'spin 1.2s linear infinite',
     }} />
     <div style={{
-      fontFamily: 'var(--font-mono)', fontSize: '0.82rem',
-      color: 'rgba(0,255,204,0.45)', letterSpacing: '0.12em',
+      fontFamily: 'var(--font-ui)', fontSize: '16px',
+      color: 'var(--ink-mute)', fontWeight: 500,
     }}>
-      ⟳ AWAITING WEBHOOK DATA STREAM
+      Awaiting webhook data stream
     </div>
     <div style={{
-      fontFamily: 'var(--font-mono)', fontSize: '0.7rem',
-      color: 'rgba(255,255,255,0.2)', letterSpacing: '0.06em',
-      textAlign: 'center', lineHeight: 2,
+      fontFamily: 'var(--font-ui)', fontSize: '14px',
+      color: 'var(--ink-mute-2)', textAlign: 'center', lineHeight: 1.5,
     }}>
-      Go to Map view → click <span style={{ color: 'rgba(0,255,204,0.5)' }}>▶ START STRESS TEST</span><br />
-      Metrics will stream here in real-time via{' '}
-      <span style={{ color: 'rgba(0,255,204,0.5)' }}>/ws/metrics</span>
+      Go to Map view → click <span style={{ color: 'var(--primary)' }}>Start Stress Test</span><br />
+      Metrics will stream here in real-time via /ws/metrics
     </div>
   </div>
 );
@@ -134,71 +114,53 @@ export const PerformanceDashboard: React.FC = () => {
     <div style={{
       flex: 1,
       minWidth: 0,
-      background: 'linear-gradient(160deg, #060c18 0%, #040810 100%)',
+      background: 'var(--canvas-night)',
       display: 'flex',
       flexDirection: 'column',
-      padding: '1.75rem 2rem 1.25rem',
-      gap: '1.4rem',
-      overflow: 'hidden',
+      padding: '64px 96px',
+      gap: '32px',
+      overflow: 'auto',
       position: 'relative',
-      fontFamily: 'var(--font-mono)',
+      fontFamily: 'var(--font-ui)',
     }}>
-
-      {/* Subtle dot-grid background */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage:
-          'radial-gradient(circle, rgba(0,255,204,0.06) 1px, transparent 1px)',
-        backgroundSize: '28px 28px',
-        opacity: 0.5,
-      }} />
 
       {/* ── Header ─────────────────────────────────────────── */}
       <div style={{
         display: 'flex', justifyContent: 'space-between',
-        alignItems: 'flex-start', position: 'relative', zIndex: 1,
-        paddingBottom: '1.1rem',
-        borderBottom: '1px solid rgba(0,255,204,0.12)',
+        alignItems: 'center', position: 'relative', zIndex: 1,
+        paddingBottom: '24px',
+        borderBottom: '1px solid var(--hairline)',
       }}>
         <div>
           {/* Title */}
           <div style={{
             display: 'flex', alignItems: 'center',
-            gap: '0.55rem', marginBottom: '0.5rem',
+            gap: '12px', marginBottom: '8px',
           }}>
-            <span style={{
-              color: 'var(--cyan)', fontSize: '1.1rem',
-              fontWeight: 700, lineHeight: 1,
-            }}>›</span>
             <h2 style={{
               margin: 0,
-              fontFamily: 'var(--font-mono)',
-              fontSize: '1rem',
-              fontWeight: 700,
-              color: 'var(--cyan)',
-              letterSpacing: '0.14em',
-              textShadow: '0 0 24px rgba(0,255,204,0.45)',
+              fontFamily: 'var(--font-ui)',
+              fontSize: '36px',
+              fontWeight: 500,
+              color: 'var(--on-dark)',
+              letterSpacing: '-0.72px',
+              lineHeight: 1.15,
             }}>
-              SYSTEM FORENSICS — PERFORMANCE ANALYTICS
+              System Forensics
             </h2>
           </div>
 
           {/* Subtitle */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '0.6rem',
+            display: 'flex', alignItems: 'center', gap: '8px',
           }}>
-            <div style={{
-              width: 2, height: '1.1em',
-              background: 'var(--cyan)',
-              boxShadow: '0 0 6px var(--cyan)',
-              flexShrink: 0,
-            }} />
             <span style={{
-              fontSize: '0.75rem', fontFamily: 'var(--font-ui)',
-              color: 'rgba(255,255,255,0.5)', letterSpacing: '0.03em',
+              fontSize: '18px', fontFamily: 'var(--font-ui)',
+              color: 'var(--ink-mute)', fontWeight: 400,
+              lineHeight: 1.55,
             }}>
               {hasData
-                ? 'Live data streaming from /ws/metrics'
+                ? 'Performance analytics streaming from /ws/metrics'
                 : 'Waiting for load test — start stress test from Map view'}
             </span>
           </div>
@@ -206,23 +168,21 @@ export const PerformanceDashboard: React.FC = () => {
 
         {/* LIVE badge */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.45rem',
-          fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.12em',
-          color: hasData ? '#00ff88' : 'rgba(255,204,0,0.75)',
-          fontFamily: 'var(--font-mono)',
-          background: hasData ? 'rgba(0,255,136,0.07)' : 'rgba(255,204,0,0.06)',
-          border: `1px solid ${hasData ? 'rgba(0,255,136,0.25)' : 'rgba(255,204,0,0.2)'}`,
-          borderRadius: '4px',
-          padding: '0.3rem 0.65rem',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          fontSize: '13px', fontWeight: 500,
+          color: hasData ? 'var(--on-dark)' : 'var(--ink-mute)',
+          fontFamily: 'var(--font-ui)',
+          background: 'var(--canvas-night-soft)',
+          border: '1px solid var(--hairline)',
+          borderRadius: '12px',
+          padding: '8px 16px',
         }}>
           <span style={{
-            width: 7, height: 7, borderRadius: '50%',
-            background: hasData ? '#00ff88' : '#ffcc00',
-            boxShadow: hasData ? '0 0 8px #00ff88' : '0 0 8px #ffcc00',
+            width: 8, height: 8, borderRadius: '50%',
+            background: hasData ? 'var(--primary)' : 'var(--ink-mute-2)',
             display: 'inline-block',
-            animation: 'pulse-dot 1.4s ease-in-out infinite',
           }} />
-          {hasData ? '⊳◁ LIVE' : '◌ STANDBY'}
+          {hasData ? 'Live' : 'Standby'}
         </div>
       </div>
 
@@ -230,99 +190,101 @@ export const PerformanceDashboard: React.FC = () => {
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: '1rem',
+        gap: '24px',
         position: 'relative', zIndex: 1,
         flexShrink: 0,
       }}>
         <MetricCard
-          icon={<Activity size={13} />}
+          icon={<Activity size={18} />}
           label="Requests Made"
           value={metrics.totalRequestsMade.toLocaleString()}
           unit="reqs"
-          accent="#00ffcc"
+          accent="var(--primary-soft)"
         />
         <MetricCard
-          icon={<AlertTriangle size={13} />}
+          icon={<AlertTriangle size={18} />}
           label="HTTP Failures"
           value={metrics.httpFailures.toLocaleString()}
           unit="reqs"
-          accent="#ff00aa"
-          valueColor={metrics.httpFailures > 0 ? '#ff00aa' : undefined}
+          accent="var(--accent-purple)"
+          valueColor={metrics.httpFailures > 0 ? 'var(--accent-purple)' : undefined}
         />
         <MetricCard
-          icon={<Zap size={13} />}
+          icon={<Zap size={18} />}
           label="Current RPS"
           value={metrics.currentRps.toLocaleString()}
           unit="req/s"
-          accent="#00dd88"
+          accent="var(--primary)"
         />
         <MetricCard
-          icon={<Clock size={13} />}
-          label="P95 Response Time"
+          icon={<Clock size={18} />}
+          label="P95 Response"
           value={p95Display.value}
           unit={p95Display.unit}
-          accent="#00aaff"
+          accent="var(--accent-yellow)"
         />
       </div>
 
       {/* ── Chart ──────────────────────────────────────────── */}
       <div style={{
-        flex: 1, minHeight: 0,
-        background: 'rgba(4, 8, 18, 0.75)',
-        border: '1px solid rgba(255,255,255,0.055)',
-        borderRadius: '6px',
-        padding: hasData ? '1.25rem 0.5rem 0.25rem 0' : '0',
+        flex: 1, minHeight: 400,
+        background: 'var(--canvas-night-soft)',
+        border: '1px solid var(--hairline)',
+        borderRadius: '12px',
+        padding: hasData ? '32px 16px 16px 0' : '0',
         position: 'relative', zIndex: 1,
         overflow: 'hidden',
-        backdropFilter: 'blur(8px)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.08)',
       }}>
         {!hasData ? <EmptyState /> : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 10, right: 55, left: 30, bottom: 35 }}>
               <defs>
                 <linearGradient id="gF" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#ff00aa" stopOpacity={0.95} />
-                  <stop offset="100%" stopColor="#ff00aa" stopOpacity={0.12} />
+                  <stop offset="0%"   stopColor="var(--accent-purple)" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="var(--accent-purple)" stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient id="gR" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#00ff88" stopOpacity={0.65} />
-                  <stop offset="100%" stopColor="#00ff88" stopOpacity={0.04} />
+                  <stop offset="0%"   stopColor="var(--primary)" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient id="gP" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor="#00aaff" stopOpacity={0.55} />
-                  <stop offset="100%" stopColor="#00aaff" stopOpacity={0.04} />
+                  <stop offset="0%"   stopColor="var(--accent-yellow)" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="var(--accent-yellow)" stopOpacity={0.0} />
                 </linearGradient>
               </defs>
 
               <CartesianGrid
-                strokeDasharray="3 8"
-                stroke="rgba(255,255,255,0.04)"
+                strokeDasharray="3 3"
+                stroke="var(--ink-mute-2)"
                 vertical={false}
+                opacity={0.2}
               />
 
               <XAxis
                 dataKey="time"
-                stroke="rgba(255,255,255,0.08)"
-                tick={{ fill: 'rgba(255,255,255,0.38)', fontSize: 10, fontFamily: 'var(--font-mono)' }}
-                tickMargin={10}
-                minTickGap={28}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                stroke="var(--hairline-strong)"
+                tick={{ fill: 'var(--ink-mute)', fontSize: 13, fontFamily: 'var(--font-mono)' }}
+                tickMargin={16}
+                minTickGap={32}
+                axisLine={{ stroke: 'var(--hairline-strong)' }}
               />
 
               {/* Left axis — counts */}
               <YAxis
                 yAxisId="left"
-                stroke="rgba(255,255,255,0.08)"
-                tick={{ fill: 'rgba(255,255,255,0.38)', fontSize: 10, fontFamily: 'var(--font-mono)' }}
+                stroke="var(--hairline-strong)"
+                tick={{ fill: 'var(--ink-mute)', fontSize: 13, fontFamily: 'var(--font-mono)' }}
                 domain={[0, 'auto']}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                axisLine={false}
+                tickLine={false}
                 label={{
-                  value: 'Failure / Request Rate [per sec]',
+                  value: 'Failure / Request Rate',
                   angle: -90,
                   position: 'insideLeft',
-                  offset: -14,
-                  fill: 'rgba(255,255,255,0.28)',
-                  style: { textAnchor: 'middle', fontFamily: 'var(--font-ui)', fontSize: 10 },
+                  offset: -10,
+                  fill: 'var(--ink-mute)',
+                  style: { textAnchor: 'middle', fontFamily: 'var(--font-ui)', fontSize: 13 },
                 }}
               />
 
@@ -330,24 +292,26 @@ export const PerformanceDashboard: React.FC = () => {
               <YAxis
                 yAxisId="right"
                 orientation="right"
-                stroke="rgba(255,255,255,0.08)"
-                tick={{ fill: 'rgba(255,255,255,0.38)', fontSize: 10, fontFamily: 'var(--font-mono)' }}
+                stroke="var(--hairline-strong)"
+                tick={{ fill: 'var(--ink-mute)', fontSize: 13, fontFamily: 'var(--font-mono)' }}
                 domain={[0, 'auto']}
                 tickFormatter={v => `${v}s`}
-                axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                axisLine={false}
+                tickLine={false}
               />
 
               <Tooltip
                 contentStyle={{
-                  background: 'rgba(4,8,20,0.97)',
-                  border: '1px solid rgba(0,255,204,0.2)',
-                  borderRadius: '5px',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.7)',
-                  fontFamily: 'var(--font-mono)',
+                  background: 'var(--canvas-night)',
+                  border: '1px solid var(--hairline)',
+                  borderRadius: '8px',
+                  boxShadow: '0 16px 48px rgba(0,0,0,0.12)',
+                  fontFamily: 'var(--font-ui)',
+                  padding: '16px',
                 }}
-                itemStyle={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)' }}
-                labelStyle={{ fontSize: '11px', color: 'rgba(0,255,204,0.55)', marginBottom: '6px' }}
-                formatter={(v: number, name: string) =>
+                itemStyle={{ fontSize: '14px', color: 'var(--on-dark)', fontWeight: 500 }}
+                labelStyle={{ fontSize: '13px', color: 'var(--ink-mute)', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}
+                formatter={(v: any, name: any) =>
                   name === 'Response time (s)'
                     ? [`${v.toFixed(3)} s`, name]
                     : [v.toLocaleString(), name]
@@ -356,42 +320,42 @@ export const PerformanceDashboard: React.FC = () => {
 
               <Legend
                 verticalAlign="bottom"
-                iconType="square"
-                iconSize={10}
+                iconType="circle"
+                iconSize={8}
                 wrapperStyle={{
-                  paddingTop: '12px',
-                  fontSize: '11px',
+                  paddingTop: '24px',
+                  fontSize: '13px',
                   fontFamily: 'var(--font-ui)',
-                  color: 'rgba(255,255,255,0.45)',
+                  color: 'var(--ink-mute)',
                 }}
               />
 
-              {/* Failure rate — most prominent, rendered first so others sit on top */}
+              {/* Failure rate */}
               <Area
                 yAxisId="left" type="monotone"
                 dataKey="httpFailures" name="Failure rate"
-                stroke="#ff00aa" strokeWidth={2}
+                stroke="var(--accent-purple)" strokeWidth={2}
                 fill="url(#gF)" fillOpacity={1}
                 isAnimationActive={false}
-                activeDot={{ r: 4, fill: '#ff00aa', stroke: '#fff', strokeWidth: 1 }}
+                activeDot={{ r: 4, fill: 'var(--accent-purple)', stroke: 'var(--canvas-night)', strokeWidth: 2 }}
               />
               {/* Request rate */}
               <Area
                 yAxisId="left" type="monotone"
                 dataKey="currentRps" name="Request rate"
-                stroke="#00ff88" strokeWidth={1.5}
+                stroke="var(--primary)" strokeWidth={2}
                 fill="url(#gR)" fillOpacity={1}
                 isAnimationActive={false}
-                activeDot={{ r: 4, fill: '#00ff88', stroke: '#fff', strokeWidth: 1 }}
+                activeDot={{ r: 4, fill: 'var(--primary)', stroke: 'var(--canvas-night)', strokeWidth: 2 }}
               />
               {/* P95 Response time */}
               <Area
                 yAxisId="right" type="monotone"
                 dataKey="p95Sec" name="Response time (s)"
-                stroke="#00aaff" strokeWidth={2}
+                stroke="var(--accent-yellow)" strokeWidth={2}
                 fill="url(#gP)" fillOpacity={1}
                 isAnimationActive={false}
-                activeDot={{ r: 4, fill: '#00aaff', stroke: '#fff', strokeWidth: 1 }}
+                activeDot={{ r: 4, fill: 'var(--accent-yellow)', stroke: 'var(--canvas-night)', strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>

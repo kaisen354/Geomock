@@ -18,8 +18,7 @@ if (Test-Path $envFile) {
 }
 
 if (-not $env:OPENROUTER_API_KEY -or $env:OPENROUTER_API_KEY -eq "YOUR_KEY_HERE") {
-    Write-Host "[error] OPENROUTER_API_KEY is not set in .env - open .env and paste your key." -ForegroundColor Red
-    exit 1
+    Write-Host "[warn] OPENROUTER_API_KEY is not set in .env. You must enter it in the app UI." -ForegroundColor Yellow
 }
 
 Write-Host ""

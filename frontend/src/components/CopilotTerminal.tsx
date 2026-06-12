@@ -3,7 +3,6 @@ import React, {
   useRef,
   useEffect,
   useCallback,
-  useId,
 } from 'react';
 import type { LatLngBoundsExpression } from 'leaflet';
 

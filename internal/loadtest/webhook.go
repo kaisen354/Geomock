@@ -13,13 +13,9 @@ type WebhookForwarder struct {
 	TargetURL string
 	client    *http.Client
 	PayloadCh chan []byte
-	StatsChan chan RequestStat
+	StatsChan chan ExtendedRequestStat
 }
 
-type RequestStat struct {
-	Code    int
-	Latency time.Duration
-}
 
 func NewWebhookForwarder(targetURL string) *WebhookForwarder {
 	// Custom transport for high concurrency and connection reuse
@@ -36,7 +32,7 @@ func NewWebhookForwarder(targetURL string) *WebhookForwarder {
 		},
 		// Buffer payloads so simulation loop is never blocked
 		PayloadCh: make(chan []byte, 100),
-		StatsChan: make(chan RequestStat, 1000),
+		StatsChan: make(chan ExtendedRequestStat, 1000),
 	}
 }
 
@@ -76,13 +72,13 @@ func (wf *WebhookForwarder) sendPayload(ctx context.Context, data []byte) {
 
 	if err != nil {
 		log.Printf("[Webhook] POST failed: %v", err)
-		wf.StatsChan <- RequestStat{Code: 0, Latency: latency} // Represent error with 0
+		wf.StatsChan <- ExtendedRequestStat{Code: 0, Latency: latency} // Represent error with 0
 		return
 	}
 	defer resp.Body.Close()
 
 	// Track status codes & latency
-	wf.StatsChan <- RequestStat{Code: resp.StatusCode, Latency: latency}
+	wf.StatsChan <- ExtendedRequestStat{Code: resp.StatusCode, Latency: latency}
 }
 
 func (wf *WebhookForwarder) reporter(ctx context.Context) {
