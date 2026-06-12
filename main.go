@@ -787,9 +787,13 @@ func main() {
 	handler := corsMiddleware(mux)
 
 	// Start HTTP server in background
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	go func() {
-		fmt.Println("Server listening on :8080")
-		if err := http.ListenAndServe(":8080", handler); err != nil {
+		fmt.Printf("Server listening on :%s\n", port)
+		if err := http.ListenAndServe(":"+port, handler); err != nil {
 			log.Fatalf("HTTP server error: %v", err)
 		}
 	}()
