@@ -5,17 +5,48 @@ const INITIAL_BACKOFF_MS = 250;
 const MAX_BACKOFF_MS = 32_000;
 const JITTER_FACTOR = 0.1;
 
+export interface TopologyNode {
+  id: string;
+  name: string;
+  group: string;
+  val: number;
+  color: string;
+  stat?: string;
+  status?: string;
+}
+
+export interface TopologyLink {
+  source: string;
+  target: string;
+  throughput: number;
+  particles: number;
+  color?: string;
+}
+
+export interface TopologyData {
+  nodes: TopologyNode[];
+  links: TopologyLink[];
+}
+
 export interface MetricsPayload {
   totalRequestsMade: number;
   currentRps: number;
   httpFailures: number;
   p95ResponseTime: number; // in ms
+  p50ResponseTime?: number;
+  p90ResponseTime?: number;
+  p99ResponseTime?: number;
+  avgTtfb?: number;
+  activeConnections?: number;
+  statusCounts?: Record<number, number>;
   time?: string;
+  topology?: TopologyData;
 }
 
 export interface MetricsHandle {
   metrics: MetricsPayload;
   history: MetricsPayload[];
+  topology: TopologyData | null;
 }
 
 export function useMetrics(): MetricsHandle {
@@ -26,6 +57,7 @@ export function useMetrics(): MetricsHandle {
     p95ResponseTime: 0,
   });
   const [history, setHistory] = useState<MetricsPayload[]>([]);
+  const [topology, setTopology] = useState<TopologyData | null>(null);
 
   const backoffRef = useRef(INITIAL_BACKOFF_MS);
   const wsRef = useRef<WebSocket | null>(null);
@@ -52,6 +84,9 @@ export function useMetrics(): MetricsHandle {
           const payload = JSON.parse(evt.data) as MetricsPayload;
           payload.time = new Date().toLocaleTimeString([], { minute: '2-digit', second: '2-digit' });
           setMetrics(payload);
+          if (payload.topology) {
+            setTopology(payload.topology);
+          }
           setHistory(prev => {
             const next = [...prev, payload];
             if (next.length > 60) next.shift(); // Keep last 60 seconds
@@ -93,5 +128,5 @@ export function useMetrics(): MetricsHandle {
     };
   }, [connect]);
 
-  return { metrics, history };
+  return { metrics, history, topology };
 }

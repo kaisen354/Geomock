@@ -27,6 +27,9 @@ type ControlArgs struct {
 	TickRateMs   int               `json:"tickRateMs"`
 	TargetCity   string            `json:"targetCity,omitempty"`
 	TargetBounds *BoundingEnvelope `json:"targetBounds,omitempty"`
+	// Phase 5: A* routing target coordinates (optional)
+	TargetLat float64 `json:"targetLat,omitempty"`
+	TargetLng float64 `json:"targetLng,omitempty"`
 }
 
 // ChatResult is the value returned by OverseerAgent.Chat.
@@ -51,19 +54,20 @@ type OverseerAgent struct {
 }
 
 // NewOverseerAgent constructs an OverseerAgent using the
-// OPENROUTER_API_KEY environment variable. Fatals if the key is absent.
+// OPENROUTER_API_KEY environment variable. If absent, it logs a warning.
 func NewOverseerAgent() *OverseerAgent {
 	apiKey := os.Getenv("OPENROUTER_API_KEY")
+	var client *openai.Client
+	
 	if apiKey == "" {
-		log.Fatal("[Overseer] OPENROUTER_API_KEY environment variable is not set — aborting startup")
+		log.Println("[Overseer] Warning: OPENROUTER_API_KEY environment variable is not set. A dynamic key must be provided in requests.")
+	} else {
+		config := openai.DefaultConfig(apiKey)
+		config.BaseURL = "https://openrouter.ai/api/v1"
+		client = openai.NewClientWithConfig(config)
+		log.Println("[Overseer] OpenRouter AI agent initialized successfully with environment key")
 	}
 
-	config := openai.DefaultConfig(apiKey)
-	config.BaseURL = "https://openrouter.ai/api/v1"
-
-	client := openai.NewClientWithConfig(config)
-
-	log.Println("[Overseer] OpenRouter AI agent initialized successfully")
 	return &OverseerAgent{
 		client: client,
 		model:  "google/gemini-2.5-flash",
@@ -108,6 +112,14 @@ func controlSimulationTool() openai.Tool {
 						},
 						Required: []string{"minLat", "maxLat", "minLng", "maxLng"},
 					},
+					"targetLat": {
+						Type:        jsonschema.Number,
+						Description: "Optional. Latitude of a specific destination landmark or point of interest. Populate this (along with targetLng) when the user asks agents to navigate TO a specific location using road routing. Example: 51.5007 for the Houses of Parliament.",
+					},
+					"targetLng": {
+						Type:        jsonschema.Number,
+						Description: "Optional. Longitude of the dispatch destination. Must accompany targetLat.",
+					},
 				},
 				Required: []string{"agentCount", "tickRateMs"},
 			},
@@ -129,6 +141,13 @@ parameters. Do not ask for confirmation — execute immediately.
 
 If the operator asks to deploy to a specific city, you must provide BOTH targetCity and targetBounds (the approximate latitude and longitude bounding box of that city). You support ANY city in the world.
 
+If the operator references a specific destination landmark or point of interest (e.g. "send agents
+to the Golden Gate Bridge", "route 200 agents to Big Ben", "deploy to the Eiffel Tower"), you MUST
+resolve its precise coordinates and populate BOTH targetLat and targetLng in your
+control_simulation call. The backend will compute A* shortest-path routes from each agent's
+current position to that exact point on the loaded road network. This is more precise than a
+city-level teleport — use it whenever a specific destination is mentioned.
+
 After calling the function, respond with a short, confident status message in the style of a
 military operations center (e.g. "Deploying 500 agents to London sector. Tick rate set to 200ms.").
 
@@ -142,7 +161,17 @@ Default tick rate if unspecified: 500ms. Default agent count if unspecified: 100
 // ─────────────────────────────────────────────────────────────
 
 // Chat sends userText to the model and returns the result.
-func (o *OverseerAgent) Chat(ctx context.Context, userText string) (ChatResult, error) {
+func (o *OverseerAgent) Chat(ctx context.Context, userText string, dynamicApiKey string) (ChatResult, error) {
+	client := o.client
+	if dynamicApiKey != "" {
+		config := openai.DefaultConfig(dynamicApiKey)
+		config.BaseURL = "https://openrouter.ai/api/v1"
+		client = openai.NewClientWithConfig(config)
+	}
+	if client == nil {
+		return ChatResult{}, fmt.Errorf("no openrouter api key configured (neither environment nor dynamic)")
+	}
+
 	req := openai.ChatCompletionRequest{
 		Model: o.model,
 		MaxTokens: 1000,
@@ -159,7 +188,7 @@ func (o *OverseerAgent) Chat(ctx context.Context, userText string) (ChatResult, 
 		Tools: []openai.Tool{controlSimulationTool()},
 	}
 
-	resp, err := o.client.CreateChatCompletion(ctx, req)
+	resp, err := client.CreateChatCompletion(ctx, req)
 	if err != nil {
 		return ChatResult{}, fmt.Errorf("openrouter generate: %w", err)
 	}
@@ -218,4 +247,56 @@ func unmarshalJSONControlArgs(raw string) (ControlArgs, error) {
 	}
 
 	return args, nil
+}
+
+// ─────────────────────────────────────────────────────────────
+// Diagnostics Expert
+// ─────────────────────────────────────────────────────────────
+
+const diagnosticsInstruction = `You are a GEOMOCK API performance optimization expert.
+You help engineers diagnose load testing issues based on live telemetry data.
+You will be given the user's question along with the current metrics (RPS, failures, latency) and the state of pipeline nodes.
+Reference the specific nodes provided (e.g., "Ingestion Chan", "WebSocket Hub", "Redis Stream") and give concrete, actionable optimization suggestions (e.g., connection pooling, rate limiting, caching strategies, async queue tuning, horizontal scaling, circuit breakers).
+Keep your responses concise and highly technical. Use the same vocabulary as the dashboard.
+Where relevant, suggest which graph or node to look at to verify the issue.`
+
+// ChatDiagnostics sends a diagnostics question to the model with live context.
+// No tools are used here, just text-in, text-out.
+func (o *OverseerAgent) ChatDiagnostics(ctx context.Context, contextPayload string, userQuestion string, dynamicApiKey string) (string, error) {
+	client := o.client
+	if dynamicApiKey != "" {
+		config := openai.DefaultConfig(dynamicApiKey)
+		config.BaseURL = "https://openrouter.ai/api/v1"
+		client = openai.NewClientWithConfig(config)
+	}
+	if client == nil {
+		return "", fmt.Errorf("no openrouter api key configured (neither environment nor dynamic)")
+	}
+
+	prompt := fmt.Sprintf("Live Context:\n%s\n\nUser Question:\n%s", contextPayload, userQuestion)
+	req := openai.ChatCompletionRequest{
+		Model: o.model,
+		MaxTokens: 1500,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: diagnosticsInstruction,
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: prompt,
+			},
+		},
+	}
+
+	resp, err := client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("openrouter generate diagnostics: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("empty response from API")
+	}
+
+	return resp.Choices[0].Message.Content, nil
 }

@@ -29,6 +29,11 @@ type DriverAgent struct {
 	bearing              float64 // last computed bearing in degrees
 	TickRate             int     // Milliseconds per tick
 	Graph                *graph.Graph
+
+	// ── A* routing fields (Phase 5) ──────────────────────────────
+	TargetDestination *graph.Coordinate  // nullable; the A* goal node
+	CurrentRoute      []graph.Coordinate // ordered waypoints returned by FindShortestPath
+	RouteIndex        int                // next waypoint index in CurrentRoute
 }
 
 func (a *DriverAgent) Run(ctx context.Context) {
@@ -49,6 +54,59 @@ func (a *DriverAgent) Run(ctx context.Context) {
 			remainingSpeed := a.Speed
 			
 			for remainingSpeed > 0 {
+				// ── Priority 1: Follow A* route ───────────────────────────────
+				if len(a.CurrentRoute) > 0 && a.RouteIndex < len(a.CurrentRoute) {
+					waypoint := a.CurrentRoute[a.RouteIndex]
+					target := Coordinate{Lat: waypoint.Lat, Lng: waypoint.Lng}
+					dx := target.Lng - a.Lng
+					dy := target.Lat - a.Lat
+					distSq := dx*dx + dy*dy
+
+					if distSq <= remainingSpeed*remainingSpeed {
+						// Reached this waypoint
+						dist := math.Sqrt(distSq)
+						a.Lat = target.Lat
+						a.Lng = target.Lng
+						remainingSpeed -= dist
+						a.RouteIndex++
+
+						if dist > 0 {
+							bearingRad := math.Atan2(dx, dy)
+							bearingDeg := bearingRad * 180 / math.Pi
+							if bearingDeg < 0 {
+								bearingDeg += 360
+							}
+							a.bearing = bearingDeg
+						}
+						if dist == 0 {
+							remainingSpeed -= a.Speed * 0.1
+						}
+
+						// Exhausted the A* route → clear and fall through to idle wander
+						if a.RouteIndex >= len(a.CurrentRoute) {
+							a.CurrentRoute = nil
+							a.RouteIndex = 0
+							a.TargetDestination = nil
+						}
+					} else {
+						// Move partially toward waypoint
+						dist := math.Sqrt(distSq)
+						ratio := remainingSpeed / dist
+						a.Lat += dy * ratio
+						a.Lng += dx * ratio
+						remainingSpeed = 0
+
+						bearingRad := math.Atan2(dx, dy)
+						bearingDeg := bearingRad * 180 / math.Pi
+						if bearingDeg < 0 {
+							bearingDeg += 360
+						}
+						a.bearing = bearingDeg
+					}
+					continue
+				}
+
+				// ── Priority 2: Idle wander (original GetRandomNeighbor logic) ─
 				if a.CurrentWaypointIndex >= len(a.Route) {
 					// Finished route, pick next node using Graph if available
 					if a.Graph != nil {
@@ -139,6 +197,13 @@ func (a *DriverAgent) Run(ctx context.Context) {
 		}
 	}
 }
+
+// Lock acquires the agent's internal mutex. Use for external packages that
+// need to atomically read or write agent state (e.g. the /api/chat handler).
+func (a *DriverAgent) Lock() { a.mu.Lock() }
+
+// Unlock releases the agent's internal mutex.
+func (a *DriverAgent) Unlock() { a.mu.Unlock() }
 
 // Rescatter safely repositions the agent and resets its routing
 func (a *DriverAgent) Rescatter(lat, lng float64) {

@@ -85,7 +85,6 @@ const FEATURES: FCard[] = [
     body: 'Spin up 1 000+ autonomous driver agents in a single command, each navigating realistic road-graph routes at configurable tick-rates.',
     tag: 'Core',
     accent: '#3ecf8e',
-    large: true,
     visual: (
       <div className="wlc-card-visual wlc-visual-engine">
         {Array.from({ length: 24 }).map((_, i) => (
@@ -134,7 +133,6 @@ const FEATURES: FCard[] = [
     title: 'Performance Analytics',
     body: 'Real-time throughput charts, latency histograms, and anomaly counters — all rendered via live WebSocket metrics.',
     accent: '#3ecf8e',
-    large: true,
     visual: (
       <div className="wlc-card-visual wlc-visual-chart">
         {[40, 65, 52, 78, 61, 84, 70, 95, 80].map((h, i) => (
@@ -246,8 +244,8 @@ export const WelcomePage: React.FC<Props> = ({ onEnter }) => {
       ══════════════════════════════════════════ */}
       <section className="wlc-hero" ref={heroRef}>
         <div className="wlc-container">
-          {/* eyebrow tag */}
-          <div className="wlc-pill">GeoMock · v4.0 · Phase 4</div>
+          {/* Logo */}
+          <img src="/logo.png" alt="GeoMock Logo" className="wlc-hero-logo" />
 
           {/* headline */}
           <h1 className="wlc-headline">

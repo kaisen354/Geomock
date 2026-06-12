@@ -103,21 +103,22 @@ export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
     <aside className="sidebar">
       {/* ── Header ── */}
       <div className="sidebar-logo">
-        ⬡ GEOMOCK
+        <span style={{ color: 'var(--primary)', marginRight: '0.5rem' }}>⬡</span> GEOMOCK
         <span style={{
-          fontSize: '0.6rem',
+          fontSize: '0.7rem',
           marginLeft: '0.5rem',
-          color: 'rgba(0,255,204,0.4)',
+          color: 'var(--ink-mute)',
           fontWeight: 400,
+          fontFamily: 'var(--font-mono)'
         }}>
-          v3.0 · PHASE-3
+          v3.0
         </span>
       </div>
 
       {/* ── WS Status ── */}
       <div className="ws-indicator">
-        <div className={connected ? 'dot-connected' : 'dot-disconnected'} />
-        {connected ? 'MATRIX LINK ACTIVE' : 'CONNECTING...'}
+        <div className={connected ? 'dot-connected' : 'dot-disconnected'} style={{ background: connected ? 'var(--primary)' : 'var(--accent-tomato)', boxShadow: 'none' }} />
+        {connected ? 'Connection Active' : 'Connecting...'}
       </div>
 
       {/* ── Live Stats ── */}
@@ -129,13 +130,10 @@ export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
             <div className="stat-label">msg / sec</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value" style={{
-              color: anomalies > 0 ? 'var(--red-alert)' : 'var(--cyan)',
-              textShadow: anomalies > 0 ? '0 0 8px rgba(255,51,102,0.5)' : undefined,
-            }}>
+            <div className="stat-value" style={{ color: anomalies > 0 ? 'var(--accent-tomato)' : 'var(--ink)' }}>
               {anomalies}
             </div>
-            <div className="stat-label">⚠ anomalies</div>
+            <div className="stat-label">anomalies</div>
           </div>
         </div>
 
@@ -171,6 +169,7 @@ export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
           step={10}
           value={riderCount}
           onChange={e => setRiderCount(Number(e.target.value))}
+          style={{ accentColor: 'var(--primary)' }}
         />
         <div className="sidebar-value">{riderCount.toLocaleString()} agents</div>
       </div>
@@ -185,6 +184,7 @@ export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
           step={100}
           value={tickRate}
           onChange={e => setTickRate(Number(e.target.value))}
+          style={{ accentColor: 'var(--primary)' }}
         />
         <div className="sidebar-value">{tickRate} ms / tick</div>
       </div>
@@ -192,19 +192,19 @@ export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
       {/* ── Start Button ── */}
       <div className="sidebar-section">
         <button
-          className="btn-cyber"
-          style={{ width: '100%', clipPath: 'none', borderRadius: '3px' }}
+          className="btn-primary-green"
+          style={{ width: '100%' }}
           onClick={handleStart}
           disabled={starting}
         >
-          {starting ? '◌ STARTING...' : '▶ START STRESS TEST'}
+          {starting ? 'Starting...' : 'Start Stress Test'}
         </button>
         {startStatus && (
           <div style={{
-            fontSize: '0.72rem',
-            color: startStatus.startsWith('✓') ? '#00ff88' : 'var(--red-alert)',
-            fontFamily: 'var(--font-mono)',
-            marginTop: '0.25rem',
+            fontSize: '0.75rem',
+            color: startStatus.startsWith('✓') ? 'var(--primary-deep)' : 'var(--accent-tomato)',
+            fontFamily: 'var(--font-ui)',
+            marginTop: '0.4rem',
           }}>
             {startStatus}
           </div>
@@ -212,10 +212,10 @@ export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
       </div>
 
       {/* ── Map Ingestion ── */}
-      <div className="sidebar-section" style={{ marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid var(--border-cyber)' }}>
+      <div className="sidebar-section" style={{ marginTop: 'auto', paddingTop: '1.5rem', borderTop: '1px solid var(--hairline)' }}>
         <div className="sidebar-label">Map Ingestion</div>
-        <div style={{ fontSize: '0.72rem', color: 'rgba(0,255,204,0.45)', fontFamily: 'var(--font-mono)', lineHeight: 1.6, marginBottom: '0.6rem' }}>
-          Drop a <span style={{ color: 'var(--cyan)' }}>.geojson</span> onto the map,
+        <div style={{ fontSize: '0.8rem', color: 'var(--ink-mute)', fontFamily: 'var(--font-ui)', lineHeight: 1.5, marginBottom: '0.6rem' }}>
+          Drop a <span style={{ fontFamily: 'var(--font-mono)' }}>.geojson</span> onto the map,
           or browse to upload:
         </div>
 
@@ -233,29 +233,25 @@ export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
 
         {/* Browse button */}
         <button
-          className="btn-cyber"
+          className="btn-secondary-outline"
           style={{
             width: '100%',
-            clipPath: 'none',
-            borderRadius: '3px',
-            fontSize: '0.72rem',
-            padding: '0.45rem 0.5rem',
             opacity: uploading ? 0.6 : 1,
             cursor: uploading ? 'not-allowed' : 'pointer',
           }}
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
         >
-          {uploading ? '⟳ UPLOADING...' : '📁 BROWSE .GEOJSON'}
+          {uploading ? 'Uploading...' : 'Browse .geojson'}
         </button>
 
         {/* Upload status */}
         {uploadStatus && (
           <div style={{
-            fontSize: '0.7rem',
-            marginTop: '0.35rem',
-            fontFamily: 'var(--font-mono)',
-            color: uploadStatus.startsWith('✓') ? '#00ff88' : uploadStatus.startsWith('⟳') ? 'var(--cyan)' : 'var(--red-alert)',
+            fontSize: '0.75rem',
+            marginTop: '0.4rem',
+            fontFamily: 'var(--font-ui)',
+            color: uploadStatus.startsWith('✓') ? 'var(--primary-deep)' : uploadStatus.startsWith('⟳') ? 'var(--ink)' : 'var(--accent-tomato)',
           }}>
             {uploadStatus}
           </div>

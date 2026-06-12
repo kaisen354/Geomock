@@ -37,6 +37,11 @@ var (
 	simAgents  []*engine.DriverAgent
 	overseer   *ai.OverseerAgent
 	simGraph   *graph.Graph
+
+	loadTestMu     sync.Mutex
+	activeLoadTest *loadtest.LoadTestEngine
+	activeLTCtx    context.Context
+	activeLTCancel context.CancelFunc
 )
 
 // corsMiddleware allows the Vite dev server (and any other origin) to reach the API.
@@ -148,6 +153,106 @@ func cityBounds(city string) (BoundingEnvelope, bool) {
 		return BoundingEnvelope{MinLat: 35.55, MaxLat: 35.82, MinLng: 139.60, MaxLng: 139.90}, true
 	}
 	return BoundingEnvelope{}, false
+}
+
+// findClosestNode iterates all graph keys under a read lock and returns
+// the node nearest to (lat, lng) by Haversine distance.
+// The returned Coordinate is guaranteed to be a valid map key in g.Nodes
+// because it was produced by roundCoord during ParseGeoJSON ingestion.
+func findClosestNode(g *graph.Graph, lat, lng float64) (graph.Coordinate, bool) {
+	g.Mu().RLock()
+	keys := g.Keys
+	g.Mu().RUnlock()
+
+	if len(keys) == 0 {
+		return graph.Coordinate{}, false
+	}
+	best := keys[0]
+	bestDist := graph.HaversineDistance(lat, lng, best.Lat, best.Lng)
+	for _, k := range keys[1:] {
+		if d := graph.HaversineDistance(lat, lng, k.Lat, k.Lng); d < bestDist {
+			bestDist = d
+			best = k
+		}
+	}
+	return best, true
+}
+
+// dispatchAgentsWithRouting initialises agents and, when a target is supplied,
+// computes A* routes concurrently using a bounded worker pool of 10 goroutines.
+// Returns the configured agent slice ready for SetAgents/Start.
+func dispatchAgentsWithRouting(
+	ctx context.Context,
+	g *graph.Graph,
+	count, tickRate int,
+	targetLat, targetLng float64,
+) []*engine.DriverAgent {
+	agents := make([]*engine.DriverAgent, count)
+
+	for i := 0; i < count; i++ {
+		id := "agent_" + strconv.Itoa(i)
+		var startLat, startLng float64
+		if g != nil {
+			if node, ok := g.GetRandomNode(); ok {
+				startLat, startLng = node.Lat, node.Lng
+			} else {
+				startLat = 37.7749 + (rand.Float64()-0.5)*0.1
+				startLng = -122.4194 + (rand.Float64()-0.5)*0.1
+			}
+		} else {
+			startLat = 37.7749 + (rand.Float64()-0.5)*0.1
+			startLng = -122.4194 + (rand.Float64()-0.5)*0.1
+		}
+		agents[i] = &engine.DriverAgent{
+			ID:                   id,
+			Lat:                  startLat,
+			Lng:                  startLng,
+			Speed:                0.001,
+			CurrentWaypointIndex: 0,
+			TickRate:             tickRate,
+			Route: []engine.Coordinate{
+				{Lat: startLat, Lng: startLng},
+			},
+		}
+	}
+
+	// If a target was provided and a graph is loaded, compute A* routes.
+	if g != nil && (targetLat != 0 || targetLng != 0) {
+		targetNode, ok := findClosestNode(g, targetLat, targetLng)
+		if ok {
+			const workerPoolSize = 10
+			sem := make(chan struct{}, workerPoolSize)
+			var wg sync.WaitGroup
+
+			for i := range agents {
+				wg.Add(1)
+				sem <- struct{}{}
+				go func(i int) {
+					defer wg.Done()
+					defer func() { <-sem }()
+
+					// Snap agent start to the nearest graph node (precision guarantee).
+					startNode, startOk := findClosestNode(g, agents[i].Lat, agents[i].Lng)
+					if !startOk {
+						return
+					}
+
+					route, err := g.FindShortestPath(startNode, targetNode)
+					if err != nil || len(route) == 0 {
+						// Path not found: agent will idle-wander as fallback.
+						return
+					}
+
+					copy := targetNode // avoid taking address of loop var
+					agents[i].CurrentRoute = route
+					agents[i].TargetDestination = &copy
+				}(i)
+			}
+			wg.Wait()
+		}
+	}
+
+	return agents
 }
 
 func main() {
@@ -307,6 +412,125 @@ func main() {
 		w.Write([]byte(`{"status":"started"}`))
 	})
 
+	// POST /api/loadtest/start
+	mux.HandleFunc("/api/loadtest/start", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var cfg loadtest.LoadTestConfig
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		loadTestMu.Lock()
+		defer loadTestMu.Unlock()
+
+		if activeLoadTest != nil {
+			http.Error(w, "load test already running", http.StatusConflict)
+			return
+		}
+
+		activeLoadTest = loadtest.NewLoadTestEngine(cfg)
+		metricsAggregator.SetEngine(activeLoadTest)
+		// Point the aggregator to this new engine
+		// Actually, we also need to forward stats.
+		// So we spawn a goroutine that reads from activeLoadTest.StatsChan and writes to webhookForwarder.StatsChan
+		go func() {
+			for stat := range activeLoadTest.StatsChan {
+				webhookForwarder.StatsChan <- stat
+			}
+		}()
+
+		var ltCtx context.Context
+		ltCtx, activeLTCancel = context.WithCancel(context.Background())
+		go activeLoadTest.Start(ltCtx)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"started"}`))
+	})
+
+	// POST /api/loadtest/stop
+	mux.HandleFunc("/api/loadtest/stop", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		loadTestMu.Lock()
+		defer loadTestMu.Unlock()
+
+		if activeLoadTest != nil && activeLTCancel != nil {
+			activeLTCancel()
+			activeLoadTest = nil
+			activeLTCancel = nil
+			metricsAggregator.SetEngine(nil)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"stopped"}`))
+	})
+
+	// POST /api/dispatch — spawn agents with optional A* goal-oriented routing
+	mux.HandleFunc("/api/dispatch", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			Count     int     `json:"count"`
+			TickRate  int     `json:"tickRate"`
+			TargetLat float64 `json:"targetLat"`
+			TargetLng float64 `json:"targetLng"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.Count <= 0 {
+			req.Count = 100
+		}
+		if req.TickRate <= 0 {
+			req.TickRate = 1000
+		}
+
+		simMu.RLock()
+		g := simGraph
+		simMu.RUnlock()
+
+		// Build agents and compute routes (bounded worker pool inside).
+		newAgents := dispatchAgentsWithRouting(r.Context(), g, req.Count, req.TickRate, req.TargetLat, req.TargetLng)
+
+		simMu.Lock()
+		simAgents = newAgents
+		simMu.Unlock()
+
+		simEngine.SetAgents(newAgents)
+		simEngine.Start(ctx)
+
+		routed := 0
+		for _, a := range newAgents {
+			if len(a.CurrentRoute) > 0 {
+				routed++
+			}
+		}
+		fmt.Printf("[Dispatch] %d agents started, %d with A* routes to (%.5f, %.5f)\n",
+			req.Count, routed, req.TargetLat, req.TargetLng)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "dispatched",
+			"agents":  req.Count,
+			"routed":  routed,
+		})
+	})
+
 	// POST /api/chat — Overseer AI natural language control interface
 	mux.HandleFunc("/api/chat", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -317,6 +541,7 @@ func main() {
 		// Parse request body
 		var req struct {
 			Message string `json:"message"`
+			ApiKey  string `json:"apiKey"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Message) == "" {
 			http.Error(w, `{"error":"message field required"}`, http.StatusBadRequest)
@@ -324,7 +549,7 @@ func main() {
 		}
 
 		// Call the Overseer AI
-		result, err := overseer.Chat(r.Context(), req.Message)
+		result, err := overseer.Chat(r.Context(), req.Message, req.ApiKey)
 		if err != nil {
 			log.Printf("[Overseer] Chat error: %v", err)
 			http.Error(w, `{"error":"AI backend error"}`, http.StatusInternalServerError)
@@ -391,11 +616,94 @@ func main() {
 					log.Printf("[Overseer] Unrecognised city: %q — skipping teleport", call.TargetCity)
 				}
 			}
+
+			// 4. A* routing: if the AI resolved a landmark destination, compute routes.
+			if call.TargetLat != 0 || call.TargetLng != 0 {
+				simMu.RLock()
+				g := simGraph
+				simMu.RUnlock()
+
+				if g != nil {
+					// Re-route the existing agent fleet toward the AI-supplied coordinates.
+					targetNode, ok := findClosestNode(g, call.TargetLat, call.TargetLng)
+					if ok {
+						const workerPoolSize = 10
+						sem := make(chan struct{}, workerPoolSize)
+						var wg sync.WaitGroup
+
+						simMu.RLock()
+						agentSnapshot := make([]*engine.DriverAgent, len(simAgents))
+						copy(agentSnapshot, simAgents)
+						simMu.RUnlock()
+
+						for _, a := range agentSnapshot {
+							wg.Add(1)
+							sem <- struct{}{}
+							go func(a *engine.DriverAgent) {
+								defer wg.Done()
+								defer func() { <-sem }()
+
+								a.Lock()
+								starLat, startLng := a.Lat, a.Lng
+								a.Unlock()
+
+								startNode, ok := findClosestNode(g, starLat, startLng)
+								if !ok {
+									return
+								}
+								route, err := g.FindShortestPath(startNode, targetNode)
+								if err != nil || len(route) == 0 {
+									return
+								}
+								copyTarget := targetNode
+								a.Lock()
+								a.CurrentRoute = route
+								a.TargetDestination = &copyTarget
+								a.RouteIndex = 0
+								a.Unlock()
+							}(a)
+						}
+						wg.Wait()
+						fmt.Printf("[Overseer] A* routes dispatched to landmark (%.5f, %.5f)\n",
+							call.TargetLat, call.TargetLng)
+					}
+				} else {
+					log.Println("[Overseer] targetLat/Lng provided but no graph loaded — skipping routing")
+				}
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(resp)
+	})
+
+	// POST /api/diagnostics/chat — AI diagnostics expert
+	mux.HandleFunc("/api/diagnostics/chat", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req struct {
+			Question string `json:"question"`
+			Context  string `json:"context"`
+			ApiKey   string `json:"apiKey"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+			return
+		}
+
+		reply, err := overseer.ChatDiagnostics(r.Context(), req.Context, req.Question, req.ApiKey)
+		if err != nil {
+			log.Printf("[Diagnostics] Chat error: %v", err)
+			http.Error(w, `{"error":"AI backend error"}`, http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"reply": reply})
 	})
 
 	// POST /api/upload-map — multipart GeoJSON ingestion
