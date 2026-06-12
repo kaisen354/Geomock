@@ -14,7 +14,7 @@ interface Props {
   onFlyTo: (bounds: LatLngBoundsExpression) => void;
 }
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
 
 export const Sidebar: React.FC<Props> = ({ telemetry, onFlyTo }) => {
   const [riderCount, setRiderCount] = useState(1000);

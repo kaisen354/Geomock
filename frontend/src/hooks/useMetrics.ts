@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const WS_URL = 'ws://localhost:8080/ws/metrics';
+const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+const WS_URL = `${WS_BASE}/ws/metrics`;
 const INITIAL_BACKOFF_MS = 250;
 const MAX_BACKOFF_MS = 32_000;
 const JITTER_FACTOR = 0.1;

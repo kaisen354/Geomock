@@ -129,7 +129,8 @@ export const AIDiagnosticsPanel: React.FC = () => {
     };
 
     try {
-      const response = await fetch('http://localhost:8080/api/diagnostics/chat', {
+      const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080';
+      const response = await fetch(`${API_BASE}/api/diagnostics/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

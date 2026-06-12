@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { TelemetryPoint, StatsSnapshot } from '../types';
 
-const WS_URL = 'ws://localhost:8080/ws/live';
+const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+const WS_URL = `${WS_BASE}/ws/live`;
 const INITIAL_BACKOFF_MS = 250;
 const MAX_BACKOFF_MS = 32_000;
 const JITTER_FACTOR = 0.1;
