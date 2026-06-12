@@ -263,10 +263,21 @@ func main() {
 	if redisURL == "" {
 		redisURL = "localhost:6379"
 	}
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     redisURL,
-		PoolSize: 100,
-	})
+	var redisClient *redis.Client
+	if redisURL != "disabled" {
+		client := redis.NewClient(&redis.Options{
+			Addr:     redisURL,
+			PoolSize: 100,
+		})
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := client.Ping(ctxTimeout).Err(); err != nil {
+			log.Printf("Warning: Redis not reachable at %s (%v). Falling back to Direct WS Bridge (No-Redis mode).", redisURL, err)
+		} else {
+			redisClient = client
+			log.Printf("Connected to Redis at %s", redisURL)
+		}
+	}
 
 	streamName := "telemetry:stream"
 

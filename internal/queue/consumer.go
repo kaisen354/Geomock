@@ -26,6 +26,10 @@ func NewTelemetryConsumer(client *redis.Client, streamName string, hub *api.WebS
 }
 
 func (c *TelemetryConsumer) StartConsumingLoop(ctx context.Context) {
+	if c.client == nil {
+		return // gracefully skip Redis consumer loop
+	}
+
 	ticker := time.NewTicker(1 * time.Second) // Exactly once per second broadcast
 	defer ticker.Stop()
 
