@@ -18,6 +18,10 @@ GeoMock is built to solve the complex challenge of testing and visualizing high-
 - **60-FPS Cyberpunk Canvas Map:** The frontend uses an innovative `CanvasOverlay` atop Leaflet maps, ensuring buttery-smooth 60 FPS rendering of thousands of glowing agent trails with zero React re-renders.
 - **Performance Diagnostics Dashboard:** Real-time visual tracking of HTTP request rates, failures, and system latency.
 
+## User Flow
+
+![User Flow Diagram](./user%20flow%20diagram.png)
+
 ## System Architecture
 
 The architecture of GeoMock is split into a robust backend and a highly optimized frontend.
@@ -58,46 +62,6 @@ flowchart TD
     R -->|rescatter/start| A
 ```
 
-## User Flow
-
-This diagram illustrates the primary pathways a user takes when interacting with the GeoMock dashboard.
-
-```mermaid
-flowchart TD
-    %% Styling
-    classDef start fill:#020408,stroke:#00ffcc,stroke-width:2px,color:#00ffcc;
-    classDef view fill:#040c18,stroke:#00ccaa,stroke-width:1px,color:#fff;
-    classDef action fill:#0a192f,stroke:#ffcc00,stroke-width:1px,color:#fff;
-    classDef result fill:#112240,stroke:#00ffcc,stroke-width:1px,color:#fff;
-
-    Start([Launch GeoMock]):::start --> BootScreen[Boot Sequence / Terminal Intro]:::view
-    BootScreen -->|Animation ends, Click Connect| LiveMap[Live Map View]:::view
-
-    subgraph Main_Navigation[Main Views]
-        LiveMap <-->|Sidebar Nav| Analytics[Performance Dashboard]:::view
-    end
-
-    subgraph Interactions[Live Map User Actions]
-        direction TB
-        
-        %% Sidebar actions
-        LiveMap -->|Use Sliders| Params[Set Agents & Tick Rate]:::action
-        Params -->|Click Start| RunSim[Trigger Load Test & Simulation]:::result
-        
-        %% Map uploads
-        LiveMap -->|Drag & Drop .geojson| MapSwap[Upload City Road Network]:::action
-        MapSwap -->|Backend Parses Graph| AutoFly[Auto-pan to New City Bounds]:::result
-        
-        %% AI Copilot
-        LiveMap -->|Open Copilot Terminal| Terminal[Type Natural Language Command]:::action
-        Terminal -->|e.g. 'Spawn 500 in Tokyo'| AI[AI Parses and Executes]:::result
-        AI --> RunSim
-        AI --> AutoFly
-        
-        %% Telemetry Actions
-        LiveMap -->|Click Event on Anomaly Feed| FocusAnomaly[Zoom to Anomaly Location]:::result
-    end
-```
 
 ## Folder Structure
 
