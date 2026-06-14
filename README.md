@@ -24,6 +24,8 @@ GeoMock is built to solve the complex challenge of testing and visualizing high-
 
 ## System Architecture
 
+![New Architecture Diagram](./frontend/public/new_architecture.png)
+
 The architecture of GeoMock is split into a robust backend and a highly optimized frontend.
 
 **Backend (Go + Redis):**
